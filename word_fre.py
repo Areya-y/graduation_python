@@ -3,6 +3,7 @@
 import sys, re, collections, nltk
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
+import MySQLdb
 
 # patterns that used to find or/and replace particular chars or words
 # to find chars that are not a letter, a blank or a quotation
@@ -34,9 +35,6 @@ def get_words(file):
         words_box = []
         pat = re.compile(r'[^a-zA-Z \']+')
         for line in f:
-            # if re.match(r'[a-zA-Z]*',line):
-            #    words_box.extend(line.strip().strip('\'\"\.,').lower().split())
-            # words_box.extend(pat.sub(' ', line).strip().lower().split())
             words_box.extend(merge(replace_abbreviations(line).split()))
     return collections.Counter(words_box)
 
@@ -88,24 +86,55 @@ def append_ext(words):
     new_words = []
     for item in words:
         word, count = item
-        tag = nltk.pos_tag(word_tokenize(word))[0][1]  # tag is like [('bigger', 'JJR')]
-        new_words.append((word, count, tag))
+        mysqlUpdate(word, count)
+        new_words.append((word, count))
     return new_words
 
 
-def write_to_file(words, file='F:/毕设/数据/英一/results.txt'):
-    f = open(file, 'w')
-    for item in words:
-        for field in item:
-            f.write(str(field) + ',')
-        f.write('\n')
+def mysqlUpdate(word,count):
+    selectSql = "SELECT * FROM words_details_test WHERE word='" + word + "'"
+    print(selectSql)
+    degree = 0
+    if (count < 2):
+        degree = 0
+    elif (count >= 2 and count < 6):
+        degree = 1
+    else:
+        degree = 2
+    updateSql = "UPDATE words_details_test SET test_requency_two=" + str(count) + ",degree_two=" + str(
+        degree) + " WHERE word='" + word + "'"
+    print(updateSql)
 
+    try:
+        cursor.execute(selectSql)
+        myresult = cursor.fetchone()
+        print("select:")
+        print(myresult)
+        if (myresult != None):
+            # 执行sql语句
+            cursor.execute(updateSql)
+            print('1')
+        # 提交到数据库执行
+        db.commit()
+    except Exception as e:
+        # Rollback in case there is any error
+        db.rollback()
+        print(e)
+        print('2')
 
 if __name__ == '__main__':
-    # book = sys.argv[1]
-    book_file='F:/毕设/数据/英一/英一1997-2015.txt'
+    # 打开数据库连接
+    db = MySQLdb.connect("localhost", "root", "yry2137", "graduationproject", charset='utf8')
+
+    # 使用cursor()方法获取操作游标
+    cursor = db.cursor()
+
+    book_file='F:/毕设/数据/英二/英语二2010-2019.txt'
     print("counting...")
     words = get_words(book_file)
     print("writing file...")
-    write_to_file(append_ext(words.most_common()))
+    append_ext(words.most_common())
+
+    # 关闭数据库连接
+    db.close()
 
